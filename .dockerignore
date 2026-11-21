@@ -1,0 +1,17 @@
+
+**/.git
+**/node_modules
+**/.next
+**/dist
+**/coverage
+**/.env
+**/.env.*
+**/serviceAccountKey.json
+**/*.pem
+**/*.key
+
+**/npm-debug.log
+**/.DS_Store
+
+.gitignore
+README.md

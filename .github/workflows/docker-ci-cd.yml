@@ -1,0 +1,189 @@
+
+name: DANGOL AI - Docker CI/CD
+
+on:
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+
+  # ==================================
+  # BUILD AND PUSH DOCKER IMAGES
+  # ==================================
+  build:
+    name: Build and Push Images
+    runs-on: ubuntu-latest
+
+    outputs:
+      image_prefix: ${{ steps.vars.outputs.image_prefix }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set lowercase image name
+        id: vars
+        run: |
+          IMAGE_PREFIX="ghcr.io/${GITHUB_REPOSITORY,,}"
+          echo "image_prefix=$IMAGE_PREFIX" >> "$GITHUB_OUTPUT"
+
+      - name: Validate Firebase configuration
+        env:
+          API_KEY: ${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          AUTH_DOMAIN: ${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+          PROJECT_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+          STORAGE_BUCKET: ${{ vars.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+          SENDER_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+          APP_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_APP_ID }}
+        run: |
+          test -n "$API_KEY" || (echo "Missing Firebase API key" && exit 1)
+          test -n "$AUTH_DOMAIN" || (echo "Missing Firebase auth domain" && exit 1)
+          test -n "$PROJECT_ID" || (echo "Missing Firebase project ID" && exit 1)
+          test -n "$STORAGE_BUCKET" || (echo "Missing Firebase storage bucket" && exit 1)
+          test -n "$SENDER_ID" || (echo "Missing Firebase sender ID" && exit 1)
+          test -n "$APP_ID" || (echo "Missing Firebase app ID" && exit 1)
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # GATEWAY
+      - name: Build Gateway
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/gateway/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.vars.outputs.image_prefix }}/gateway:latest
+            ${{ steps.vars.outputs.image_prefix }}/gateway:${{ github.sha }}
+
+      # AUTH
+      - name: Build Auth
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/services/auth/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.vars.outputs.image_prefix }}/auth:latest
+            ${{ steps.vars.outputs.image_prefix }}/auth:${{ github.sha }}
+
+      # CHAT
+      - name: Build Chat
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/services/chat/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.vars.outputs.image_prefix }}/chat:latest
+            ${{ steps.vars.outputs.image_prefix }}/chat:${{ github.sha }}
+
+      # AGENT
+      - name: Build Agent
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/services/agent/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.vars.outputs.image_prefix }}/agent:latest
+            ${{ steps.vars.outputs.image_prefix }}/agent:${{ github.sha }}
+
+      # FRONTEND
+      - name: Build Frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          build-args: |
+            NEXT_PUBLIC_API_URL=/api
+            NEXT_PUBLIC_FIREBASE_API_KEY=${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
+            NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+            NEXT_PUBLIC_FIREBASE_PROJECT_ID=${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+            NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${{ vars.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+            NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ vars.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+            NEXT_PUBLIC_FIREBASE_APP_ID=${{ vars.NEXT_PUBLIC_FIREBASE_APP_ID }}
+          tags: |
+            ${{ steps.vars.outputs.image_prefix }}/frontend:latest
+            ${{ steps.vars.outputs.image_prefix }}/frontend:${{ github.sha }}
+
+
+  # ==================================
+  # DEPLOY TO VPS
+  # ==================================
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare VPS directory
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            mkdir -p /opt/dangol-ai/nginx
+
+      - name: Copy deployment configuration
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "docker-compose.yml,nginx/default.conf"
+          target: "/opt/dangol-ai"
+
+      - name: Deploy using SSH
+        uses: appleboy/ssh-action@v1.2.2
+
+        env:
+          IMAGE_PREFIX: ${{ needs.build.outputs.image_prefix }}
+          IMAGE_TAG: ${{ github.sha }}
+          GHCR_USERNAME: ${{ github.repository_owner }}
+          GHCR_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: IMAGE_PREFIX,IMAGE_TAG,GHCR_USERNAME,GHCR_TOKEN
+
+          script: |
+            set -e
+
+            cd /opt/dangol-ai
+
+            echo "$GHCR_TOKEN" | docker login ghcr.io \
+              -u "$GHCR_USERNAME" --password-stdin
+
+            docker compose config -q
+
+            docker compose pull
+
+            docker compose up -d --remove-orphans
+
+            docker image prune -f
+
+            echo "DANGOL AI deployed successfully!"

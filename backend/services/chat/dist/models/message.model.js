@@ -1,0 +1,33 @@
+import mongoose from "mongoose";
+const fileSchema = new mongoose.Schema({
+    name: String,
+    content: String
+}, {
+    _id: false
+});
+const artifactsSchema = new mongoose.Schema({
+    id: Number,
+    type: String,
+    title: String,
+    files: [fileSchema]
+}, {
+    _id: false
+});
+const messageSchema = new mongoose.Schema({
+    conversationId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Conversation"
+    },
+    role: {
+        type: String,
+        enum: ["user", "assistant", "system"]
+    },
+    content: {
+        type: String,
+    },
+    images: {
+        type: [String]
+    },
+    artifacts: [artifactsSchema]
+}, { timestamps: true });
+export const Message = mongoose.model("Message", messageSchema);
