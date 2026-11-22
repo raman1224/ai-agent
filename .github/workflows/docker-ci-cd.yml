@@ -1,3 +1,4 @@
+
 name: DANGOL AI - Docker CI/CD
 
 on:
@@ -12,7 +13,6 @@ permissions:
   packages: write
 
 jobs:
-
   # ==================================
   # BUILD AND PUSH DOCKER IMAGES
   # ==================================
@@ -20,19 +20,37 @@ jobs:
     name: Build and Push Images
     runs-on: ubuntu-latest
 
-    outputs:
-      image_prefix: ${{ steps.vars.outputs.image_prefix }}
-
     steps:
+      # CHECKOUT
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # VERIFY DOCKERFILES
+      - name: Verify Dockerfiles
+        run: |
+          set -e
+
+          echo "Checking Dockerfiles..."
+
+          test -s backend/gateway/Dockerfile
+          test -s backend/services/auth/Dockerfile
+          test -s backend/services/chat/Dockerfile
+          test -s backend/services/agent/Dockerfile
+          test -s frontend/Dockerfile
+
+          echo "All Dockerfiles found."
+
+          echo "Frontend Dockerfile size:"
+          wc -c frontend/Dockerfile
+
+      # IMAGE PREFIX
       - name: Set lowercase image name
         id: vars
         run: |
           IMAGE_PREFIX="ghcr.io/${GITHUB_REPOSITORY,,}"
           echo "image_prefix=$IMAGE_PREFIX" >> "$GITHUB_OUTPUT"
 
+      # VALIDATE FIREBASE CONFIGURATION
       - name: Validate Firebase configuration
         env:
           API_KEY: ${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
@@ -41,7 +59,10 @@ jobs:
           STORAGE_BUCKET: ${{ vars.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
           SENDER_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
           APP_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_APP_ID }}
+
         run: |
+          set -e
+
           test -n "$API_KEY" || (echo "Missing Firebase API key" && exit 1)
           test -n "$AUTH_DOMAIN" || (echo "Missing Firebase auth domain" && exit 1)
           test -n "$PROJECT_ID" || (echo "Missing Firebase project ID" && exit 1)
@@ -49,9 +70,13 @@ jobs:
           test -n "$SENDER_ID" || (echo "Missing Firebase sender ID" && exit 1)
           test -n "$APP_ID" || (echo "Missing Firebase app ID" && exit 1)
 
+          echo "Firebase configuration validated."
+
+      # DOCKER BUILD SETUP
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # GHCR LOGIN
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
@@ -59,58 +84,71 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      
+      # ==================================
       # GATEWAY
+      # ==================================
       - name: Build Gateway
         uses: docker/build-push-action@v6
         with:
           context: ./backend
-          file: ./gateway/Dockerfile
+          file: ./backend/gateway/Dockerfile
           push: true
+
           tags: |
             ${{ steps.vars.outputs.image_prefix }}/gateway:latest
             ${{ steps.vars.outputs.image_prefix }}/gateway:${{ github.sha }}
 
+      # ==================================
       # AUTH
+      # ==================================
       - name: Build Auth
         uses: docker/build-push-action@v6
         with:
           context: ./backend
-          file: ./services/auth/Dockerfile
+          file: ./backend/services/auth/Dockerfile
           push: true
+
           tags: |
             ${{ steps.vars.outputs.image_prefix }}/auth:latest
             ${{ steps.vars.outputs.image_prefix }}/auth:${{ github.sha }}
 
+      # ==================================
       # CHAT
+      # ==================================
       - name: Build Chat
         uses: docker/build-push-action@v6
         with:
           context: ./backend
-          file: ./services/chat/Dockerfile
+          file: ./backend/services/chat/Dockerfile
           push: true
+
           tags: |
             ${{ steps.vars.outputs.image_prefix }}/chat:latest
             ${{ steps.vars.outputs.image_prefix }}/chat:${{ github.sha }}
 
+      # ==================================
       # AGENT
+      # ==================================
       - name: Build Agent
         uses: docker/build-push-action@v6
         with:
           context: ./backend
-          file: ./services/agent/Dockerfile
+          file: ./backend/services/agent/Dockerfile
           push: true
+
           tags: |
             ${{ steps.vars.outputs.image_prefix }}/agent:latest
             ${{ steps.vars.outputs.image_prefix }}/agent:${{ github.sha }}
 
+      # ==================================
       # FRONTEND
+      # ==================================
       - name: Build Frontend
         uses: docker/build-push-action@v6
         with:
           context: ./frontend
-          file: ./Dockerfile
           push: true
+
           build-args: |
             NEXT_PUBLIC_API_URL=/api
             NEXT_PUBLIC_FIREBASE_API_KEY=${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
@@ -119,6 +157,18 @@ jobs:
             NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${{ vars.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
             NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ vars.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
             NEXT_PUBLIC_FIREBASE_APP_ID=${{ vars.NEXT_PUBLIC_FIREBASE_APP_ID }}
+
           tags: |
             ${{ steps.vars.outputs.image_prefix }}/frontend:latest
             ${{ steps.vars.outputs.image_prefix }}/frontend:${{ github.sha }}
+
+      # ==================================
+      # SUCCESS
+      # ==================================
+      - name: Build completed
+        run: |
+          echo "=================================="
+          echo "DANGOL AI Docker Build Successful"
+          echo "=================================="
+          echo "Images pushed to:"
+          echo "${{ steps.vars.outputs.image_prefix }}"
