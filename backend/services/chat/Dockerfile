@@ -1,27 +1,3 @@
-
-# # Stage 1: Build
-# FROM node
-
-# WORKDIR /app
-
-# COPY  package*.json ./
-
-# RUN  npm install
-
-# COPY ./services/chat/package*.json ./services/chat/
-# RUN cd services/chat && npm install
-
-
-# COPY services/chat ./services/chat
-# COPY shared ./shared
-
-# WORKDIR /app/services/chat
-
-# EXPOSE 8002
-
-# CMD ["node", "dist/index.js"]
-
-
 FROM node:22-alpine
 
 WORKDIR /app
