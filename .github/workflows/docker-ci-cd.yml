@@ -110,6 +110,7 @@ jobs:
           context: ./frontend
           file: ./frontend/Dockerfile
           push: true
+
           build-args: |
             NEXT_PUBLIC_API_URL=/api
             NEXT_PUBLIC_FIREBASE_API_KEY=${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
@@ -118,7 +119,7 @@ jobs:
             NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${{ vars.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
             NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ vars.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
             NEXT_PUBLIC_FIREBASE_APP_ID=${{ vars.NEXT_PUBLIC_FIREBASE_APP_ID }}
+
           tags: |
             ${{ steps.vars.outputs.image_prefix }}/frontend:latest
             ${{ steps.vars.outputs.image_prefix }}/frontend:${{ github.sha }}
-
