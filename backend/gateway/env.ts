@@ -14,7 +14,7 @@ const requiredEnv = (key: string): string => {
 };
 
 export const ENV = {
-  PORT: Number(process.env.PORT || 3000),
+  PORT: Number(process.env.PORT || 8000),
 
   AUTH_SERVICE: requiredEnv("AUTH_SERVICE"),
   CHAT_SERVICE: requiredEnv("CHAT_SERVICE"),

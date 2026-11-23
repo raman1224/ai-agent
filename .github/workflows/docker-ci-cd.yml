@@ -137,3 +137,20 @@ jobs:
           tags: |
             ${{ steps.vars.outputs.image_prefix }}/dangol-frontend:latest
             ${{ steps.vars.outputs.image_prefix }}/dangol-frontend:${{ github.sha }}
+
+
+            
+      - name: Deploy All Services to Render
+        env:
+          FRONTEND_HOOK: ${{ secrets.RENDER_FRONTEND_HOOK }}
+          GATEWAY_HOOK: ${{ secrets.RENDER_GATEWAY_HOOK }}
+          AUTH_HOOK: ${{ secrets.RENDER_AUTH_HOOK }}
+          AGENT_HOOK: ${{ secrets.RENDER_AGENT_HOOK }}
+          CHAT_HOOK: ${{ secrets.RENDER_CHAT_HOOK }}
+        run: |
+          curl --fail --silent --show-error -X POST "$FRONTEND_HOOK"
+          curl --fail --silent --show-error -X POST "$GATEWAY_HOOK"
+          curl --fail --silent --show-error -X POST "$AUTH_HOOK"
+          curl --fail --silent --show-error -X POST "$AGENT_HOOK"
+          curl --fail --silent --show-error -X POST "$CHAT_HOOK"
+      
