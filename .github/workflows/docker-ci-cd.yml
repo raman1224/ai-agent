@@ -1,11 +1,165 @@
 
+# name: DANGOL AI - Docker CI/CD
+
+# on:
+#   push:
+#     branches:
+#       - main
+
+#   workflow_dispatch:
+
+# permissions:
+#   contents: read
+#   packages: write
+
+# jobs:
+#   # ==================================
+#   # BUILD AND PUSH DOCKER IMAGES
+#   # ==================================
+#   build:
+#     name: Build and Push Images
+#     runs-on: ubuntu-latest
+
+#     outputs:
+#       image_prefix: ${{ steps.vars.outputs.image_prefix }}
+
+#     steps:
+#       # CHECKOUT
+#       - name: Checkout repository
+#         uses: actions/checkout@v4
+
+#       # SET LOWERCASE IMAGE NAME
+#       - name: Set lowercase image name
+#         id: vars
+#         run: |
+#           IMAGE_PREFIX="ghcr.io/${GITHUB_REPOSITORY,,}"
+#           echo "image_prefix=$IMAGE_PREFIX" >> "$GITHUB_OUTPUT"
+
+#       # VALIDATE FIREBASE CONFIGURATION
+#       - name: Validate Firebase configuration
+#         env:
+#           API_KEY: ${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
+#           AUTH_DOMAIN: ${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+#           PROJECT_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+#           STORAGE_BUCKET: ${{ vars.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+#           SENDER_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+#           APP_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_APP_ID }}
+#         run: |
+#           test -n "$API_KEY" || (echo "Missing Firebase API key" && exit 1)
+#           test -n "$AUTH_DOMAIN" || (echo "Missing Firebase auth domain" && exit 1)
+#           test -n "$PROJECT_ID" || (echo "Missing Firebase project ID" && exit 1)
+#           test -n "$STORAGE_BUCKET" || (echo "Missing Firebase storage bucket" && exit 1)
+#           test -n "$SENDER_ID" || (echo "Missing Firebase sender ID" && exit 1)
+#           test -n "$APP_ID" || (echo "Missing Firebase app ID" && exit 1)
+
+#       # DOCKER BUILDX
+#       - name: Set up Docker Buildx
+#         uses: docker/setup-buildx-action@v3
+
+#       # LOGIN TO GITHUB CONTAINER REGISTRY
+#       - name: Login to GHCR
+#         uses: docker/login-action@v3
+#         with:
+#           registry: ghcr.io
+#           username: ${{ github.actor }}
+#           password: ${{ secrets.GITHUB_TOKEN }}
+
+#       # ==================================
+#       # GATEWAY
+#       # ==================================
+#       - name: Build Gateway
+#         uses: docker/build-push-action@v6
+#         with:
+#           context: ./backend
+#           file: ./backend/gateway/Dockerfile
+#           push: true
+#           tags: |
+#             ${{ steps.vars.outputs.image_prefix }}/gateway:latest
+#             ${{ steps.vars.outputs.image_prefix }}/gateway:${{ github.sha }}
+
+#       # ==================================
+#       # AUTH
+#       # ==================================
+#       - name: Build Auth
+#         uses: docker/build-push-action@v6
+#         with:
+#           context: ./backend
+#           file: ./backend/services/auth/Dockerfile
+#           push: true
+#           tags: |
+#             ${{ steps.vars.outputs.image_prefix }}/auth:latest
+#             ${{ steps.vars.outputs.image_prefix }}/auth:${{ github.sha }}
+
+#       # ==================================
+#       # CHAT
+#       # ==================================
+#       - name: Build Chat
+#         uses: docker/build-push-action@v6
+#         with:
+#           context: ./backend
+#           file: ./backend/services/chat/Dockerfile
+#           push: true
+#           tags: |
+#             ${{ steps.vars.outputs.image_prefix }}/chat:latest
+#             ${{ steps.vars.outputs.image_prefix }}/chat:${{ github.sha }}
+
+#       # ==================================
+#       # AGENT
+#       # ==================================
+#       - name: Build Agent
+#         uses: docker/build-push-action@v6
+#         with:
+#           context: ./backend
+#           file: ./backend/services/agent/Dockerfile
+#           push: true
+#           tags: |
+#             ${{ steps.vars.outputs.image_prefix }}/agent:latest
+#             ${{ steps.vars.outputs.image_prefix }}/agent:${{ github.sha }}
+
+#       # ==================================
+#       # FRONTEND
+#       # ==================================
+#       - name: Build Frontend
+#         uses: docker/build-push-action@v6
+#         with:
+#           context: ./frontend
+#           file: ./frontend/Dockerfile
+#           push: true
+#           build-args: |
+#             NEXT_PUBLIC_API_URL=/api
+#             NEXT_PUBLIC_SERVER_URL=https://gateway-latest-rlcm.onrender.com
+#             NEXT_PUBLIC_FIREBASE_API_KEY=${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
+#             NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+#             NEXT_PUBLIC_FIREBASE_PROJECT_ID=${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+#             NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${{ vars.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+#             NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ vars.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+#             NEXT_PUBLIC_FIREBASE_APP_ID=${{ vars.NEXT_PUBLIC_FIREBASE_APP_ID }}
+#           tags: |
+#             ${{ steps.vars.outputs.image_prefix }}/dangol-frontend:latest
+#             ${{ steps.vars.outputs.image_prefix }}/dangol-frontend:${{ github.sha }}
+
+
+            
+#       - name: Deploy All Services to Render
+#         env:
+#           FRONTEND_HOOK: ${{ secrets.RENDER_FRONTEND_HOOK }}
+#           GATEWAY_HOOK: ${{ secrets.RENDER_GATEWAY_HOOK }}
+#           AUTH_HOOK: ${{ secrets.RENDER_AUTH_HOOK }}
+#           AGENT_HOOK: ${{ secrets.RENDER_AGENT_HOOK }}
+#           CHAT_HOOK: ${{ secrets.RENDER_CHAT_HOOK }}
+#         run: |
+#           curl --fail --silent --show-error -X POST "$FRONTEND_HOOK"
+#           curl --fail --silent --show-error -X POST "$GATEWAY_HOOK"
+#           curl --fail --silent --show-error -X POST "$AUTH_HOOK"
+#           curl --fail --silent --show-error -X POST "$AGENT_HOOK"
+#           curl --fail --silent --show-error -X POST "$CHAT_HOOK"
+      
+
 name: DANGOL AI - Docker CI/CD
 
 on:
   push:
-    branches:
-      - main
-
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -13,144 +167,38 @@ permissions:
   packages: write
 
 jobs:
-  # ==================================
-  # BUILD AND PUSH DOCKER IMAGES
-  # ==================================
-  build:
-    name: Build and Push Images
+  build-and-deploy:
+    name: Build backend and deploy to Render
     runs-on: ubuntu-latest
 
-    outputs:
-      image_prefix: ${{ steps.vars.outputs.image_prefix }}
-
     steps:
-      # CHECKOUT
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # SET LOWERCASE IMAGE NAME
       - name: Set lowercase image name
         id: vars
-        run: |
-          IMAGE_PREFIX="ghcr.io/${GITHUB_REPOSITORY,,}"
-          echo "image_prefix=$IMAGE_PREFIX" >> "$GITHUB_OUTPUT"
+        run: echo "image_prefix=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
 
-      # VALIDATE FIREBASE CONFIGURATION
-      - name: Validate Firebase configuration
-        env:
-          API_KEY: ${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
-          AUTH_DOMAIN: ${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
-          PROJECT_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
-          STORAGE_BUCKET: ${{ vars.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
-          SENDER_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
-          APP_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_APP_ID }}
-        run: |
-          test -n "$API_KEY" || (echo "Missing Firebase API key" && exit 1)
-          test -n "$AUTH_DOMAIN" || (echo "Missing Firebase auth domain" && exit 1)
-          test -n "$PROJECT_ID" || (echo "Missing Firebase project ID" && exit 1)
-          test -n "$STORAGE_BUCKET" || (echo "Missing Firebase storage bucket" && exit 1)
-          test -n "$SENDER_ID" || (echo "Missing Firebase sender ID" && exit 1)
-          test -n "$APP_ID" || (echo "Missing Firebase app ID" && exit 1)
+      - uses: docker/setup-buildx-action@v3
 
-      # DOCKER BUILDX
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      # LOGIN TO GITHUB CONTAINER REGISTRY
-      - name: Login to GHCR
-        uses: docker/login-action@v3
+      - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # ==================================
-      # GATEWAY
-      # ==================================
-      - name: Build Gateway
+      - name: Build and push merged backend
         uses: docker/build-push-action@v6
         with:
           context: ./backend
-          file: ./backend/gateway/Dockerfile
+          file: ./backend/Dockerfile.render
           push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: |
-            ${{ steps.vars.outputs.image_prefix }}/gateway:latest
-            ${{ steps.vars.outputs.image_prefix }}/gateway:${{ github.sha }}
+            ${{ steps.vars.outputs.image_prefix }}/backend-all:latest
+            ${{ steps.vars.outputs.image_prefix }}/backend-all:${{ github.sha }}
 
-      # ==================================
-      # AUTH
-      # ==================================
-      - name: Build Auth
-        uses: docker/build-push-action@v6
-        with:
-          context: ./backend
-          file: ./backend/services/auth/Dockerfile
-          push: true
-          tags: |
-            ${{ steps.vars.outputs.image_prefix }}/auth:latest
-            ${{ steps.vars.outputs.image_prefix }}/auth:${{ github.sha }}
-
-      # ==================================
-      # CHAT
-      # ==================================
-      - name: Build Chat
-        uses: docker/build-push-action@v6
-        with:
-          context: ./backend
-          file: ./backend/services/chat/Dockerfile
-          push: true
-          tags: |
-            ${{ steps.vars.outputs.image_prefix }}/chat:latest
-            ${{ steps.vars.outputs.image_prefix }}/chat:${{ github.sha }}
-
-      # ==================================
-      # AGENT
-      # ==================================
-      - name: Build Agent
-        uses: docker/build-push-action@v6
-        with:
-          context: ./backend
-          file: ./backend/services/agent/Dockerfile
-          push: true
-          tags: |
-            ${{ steps.vars.outputs.image_prefix }}/agent:latest
-            ${{ steps.vars.outputs.image_prefix }}/agent:${{ github.sha }}
-
-      # ==================================
-      # FRONTEND
-      # ==================================
-      - name: Build Frontend
-        uses: docker/build-push-action@v6
-        with:
-          context: ./frontend
-          file: ./frontend/Dockerfile
-          push: true
-          build-args: |
-            NEXT_PUBLIC_API_URL=/api
-            NEXT_PUBLIC_SERVER_URL=https://gateway-latest-rlcm.onrender.com
-            NEXT_PUBLIC_FIREBASE_API_KEY=${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
-            NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
-            NEXT_PUBLIC_FIREBASE_PROJECT_ID=${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
-            NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${{ vars.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
-            NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ vars.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
-            NEXT_PUBLIC_FIREBASE_APP_ID=${{ vars.NEXT_PUBLIC_FIREBASE_APP_ID }}
-          tags: |
-            ${{ steps.vars.outputs.image_prefix }}/dangol-frontend:latest
-            ${{ steps.vars.outputs.image_prefix }}/dangol-frontend:${{ github.sha }}
-
-
-            
-      - name: Deploy All Services to Render
+      - name: Deploy backend to Render
         env:
-          FRONTEND_HOOK: ${{ secrets.RENDER_FRONTEND_HOOK }}
-          GATEWAY_HOOK: ${{ secrets.RENDER_GATEWAY_HOOK }}
-          AUTH_HOOK: ${{ secrets.RENDER_AUTH_HOOK }}
-          AGENT_HOOK: ${{ secrets.RENDER_AGENT_HOOK }}
-          CHAT_HOOK: ${{ secrets.RENDER_CHAT_HOOK }}
-        run: |
-          curl --fail --silent --show-error -X POST "$FRONTEND_HOOK"
-          curl --fail --silent --show-error -X POST "$GATEWAY_HOOK"
-          curl --fail --silent --show-error -X POST "$AUTH_HOOK"
-          curl --fail --silent --show-error -X POST "$AGENT_HOOK"
-          curl --fail --silent --show-error -X POST "$CHAT_HOOK"
-      
+          BACKEND_HOOK: ${{ secrets.RENDER_BACKEND_HOOK }}
+        run: curl --fail --silent --show-error -X POST "$BACKEND_HOOK"
